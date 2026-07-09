@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project deploys a highly available PostgreSQL cluster using:
+This project automates the deployment of a three-node highly available PostgreSQL cluster using:
 
 - PostgreSQL
 - Patroni
@@ -11,16 +11,112 @@ This project deploys a highly available PostgreSQL cluster using:
 - Vagrant
 - VMware Fusion
 
-The deployment is entirely variable-driven and designed to support multiple PostgreSQL versions without changing the playbook logic.
+The deployment is entirely variable-driven and designed to support multiple PostgreSQL versions and repository sources without requiring changes to the core playbook logic.
 
-Current implementation has been validated on:
+Current implementation has been validated using:
 
 - Ubuntu 24.04 LTS
-- PostgreSQL 17 (PGDG Repository)
+- PostgreSQL 17
+- PGDG Repository
 - Patroni 4.x
 - etcd 3.4.x
-- VMware Fusion
 - Vagrant
+- VMware Fusion
+
+---
+
+# Why This Project Exists
+
+Building a highly available PostgreSQL cluster manually is often time-consuming and error-prone.
+
+This project automates:
+
+- PostgreSQL installation
+- etcd cluster deployment
+- Patroni cluster deployment
+- Streaming replication
+- Leader election
+- Failover configuration
+- Cluster validation
+
+The goal is to provide a repeatable, reusable PostgreSQL HA platform that can be deployed through Infrastructure as Code instead of manual installation procedures.
+
+---
+
+# Understanding the Components
+
+## PostgreSQL
+
+PostgreSQL is the database engine.
+
+It stores:
+
+- Application data
+- System catalogs
+- WAL records
+- Replication information
+
+Without PostgreSQL there is no database cluster.
+
+---
+
+## Patroni
+
+Patroni is a PostgreSQL high-availability framework.
+
+Patroni is responsible for:
+
+- Leader election
+- Automatic failover
+- Replica creation
+- Cluster management
+- PostgreSQL lifecycle management
+
+Without Patroni, PostgreSQL replication can exist, but failover is a manual operation.
+
+---
+
+## etcd
+
+etcd is a distributed key-value store.
+
+Patroni uses etcd as a Distributed Configuration Store (DCS).
+
+etcd stores:
+
+- Cluster state
+- Lock ownership
+- Leader information
+- Patroni cluster metadata
+
+Without etcd, Patroni members cannot coordinate cluster operations.
+
+---
+
+## How They Work Together
+
+```text
+                PostgreSQL
+                     ▲
+                     │
+                 Patroni
+                     ▲
+                     │
+                   etcd
+```
+
+### Layer Responsibilities
+
+```text
+PostgreSQL
+    └── Stores data
+
+Patroni
+    └── Manages PostgreSQL
+
+etcd
+    └── Coordinates Patroni
+```
 
 ---
 
@@ -45,26 +141,29 @@ Current implementation has been validated on:
 Patroni manages:
 
 - Leader election
+- Replica creation
 - Cluster state
-- Failover
-- Replica provisioning
-- PostgreSQL lifecycle management
+- Failover operations
+- PostgreSQL startup and shutdown
 
 etcd provides:
 
 - Distributed consensus
 - Cluster coordination
-- Leader lock management
+- Lock management
+- Cluster metadata storage
 
 ---
 
 # Design Principles
 
-The project follows a simple separation of concerns:
+The project follows a strict separation of concerns.
+
+---
 
 ## Inventory
 
-Answers:
+Defines:
 
 ```text
 Where should this be deployed?
@@ -83,7 +182,7 @@ pg03
 
 ## Variables
 
-Answers:
+Define:
 
 ```text
 What should be deployed?
@@ -95,13 +194,15 @@ Example:
 postgres_version: 17
 
 cluster_name: postgres-cluster
+
+postgres_repo: pgdg
 ```
 
 ---
 
 ## Playbooks
 
-Answers:
+Define:
 
 ```text
 How should it be deployed?
@@ -109,7 +210,7 @@ How should it be deployed?
 
 Example:
 
-```yaml
+```text
 postgresql.yml
 etcd.yml
 patroni.yml
@@ -118,12 +219,49 @@ cluster.yml
 
 ---
 
+# Deployment Flow
+
+Deployment occurs in the following sequence:
+
+```text
+cluster.yml
+    |
+    +--> postgresql.yml
+    |       |
+    |       +--> Configure repository
+    |       +--> Install PostgreSQL
+    |       +--> Create directories
+    |
+    +--> etcd.yml
+    |       |
+    |       +--> Install etcd
+    |       +--> Configure cluster
+    |       +--> Validate quorum
+    |
+    +--> patroni.yml
+            |
+            +--> Install Patroni
+            +--> Configure Patroni
+            +--> Bootstrap leader
+            +--> Build replicas
+```
+
+A complete deployment can be executed using:
+
+```bash
+ansible-playbook cluster.yml
+```
+
+---
+
 # Directory Structure
 
 ```text
 .
-├── inventory.ini
+├── README.md
 ├── cluster.yml
+├── inventory.ini
+├── ssh_config
 │
 ├── group_vars
 │   └── loftware_prod.yml
@@ -134,9 +272,8 @@ cluster.yml
 │   └── patroni.yml
 │
 ├── templates
-│   └── config.yml.j2
-│
-├── ssh_config
+│   ├── config.yml.j2
+│   └── etcd.conf.yaml.j2
 │
 └── Vagrantfile
 ```
@@ -145,15 +282,15 @@ cluster.yml
 
 # Components
 
-## PostgreSQL
+## PostgreSQL Layer
 
 Responsible for:
 
-- PGDG repository configuration
+- Repository configuration
 - PostgreSQL installation
 - Directory creation
-- PostgreSQL service management
-- Validation
+- Logging configuration
+- Service management
 
 Playbook:
 
@@ -163,13 +300,13 @@ playbooks/postgresql.yml
 
 ---
 
-## etcd
+## etcd Layer
 
 Responsible for:
 
 - etcd installation
-- Cluster member configuration
-- Cluster initialization
+- Cluster configuration
+- Quorum formation
 - Service management
 
 Playbook:
@@ -178,16 +315,22 @@ Playbook:
 playbooks/etcd.yml
 ```
 
+Template:
+
+```text
+templates/etcd.conf.yaml.j2
+```
+
 ---
 
-## Patroni
+## Patroni Layer
 
 Responsible for:
 
 - Patroni installation
 - PostgreSQL HA management
 - Leader election
-- Replica creation
+- Replica provisioning
 - Failover
 
 Playbook:
@@ -196,9 +339,15 @@ Playbook:
 playbooks/patroni.yml
 ```
 
+Template:
+
+```text
+templates/config.yml.j2
+```
+
 ---
 
-## Cluster
+## Cluster Layer
 
 Responsible for:
 
@@ -223,20 +372,44 @@ Example:
 
 ---
 
-# Configuration
+# PostgreSQL Repository Support
 
-## Inventory
-
-```ini
-[loftware_prod]
-pg01
-pg02
-pg03
-```
+The framework supports multiple PostgreSQL repository providers.
 
 ---
 
-## Variables
+## PGDG (Default)
+
+```yaml
+postgres_repo: pgdg
+```
+
+Advantages:
+
+- Official PostgreSQL packages
+- Closely aligned with PostgreSQL documentation
+- Community-supported
+- Simplified package management
+
+---
+
+## Percona
+
+```yaml
+postgres_repo: percona
+```
+
+Advantages:
+
+- Enterprise-oriented distribution
+- Percona-supported packages
+- Commonly used in enterprise environments
+
+The repository source can be changed through variables without modifying playbook logic.
+
+---
+
+# Configuration
 
 File:
 
@@ -244,9 +417,13 @@ File:
 group_vars/loftware_prod.yml
 ```
 
-### PostgreSQL
+---
+
+## PostgreSQL
 
 ```yaml
+postgres_repo: pgdg
+
 postgres_version: 17
 
 data_root: /loftware/data
@@ -256,7 +433,9 @@ log_root: /loftware/logs
 postgres_port: 5432
 ```
 
-### Cluster
+---
+
+## Patroni
 
 ```yaml
 cluster_name: postgres-cluster
@@ -264,7 +443,9 @@ cluster_name: postgres-cluster
 patroni_rest_port: 8008
 ```
 
-### etcd
+---
+
+## etcd
 
 ```yaml
 etcd_client_port: 2379
@@ -274,7 +455,9 @@ etcd_peer_port: 2380
 etcd_cluster_token: pgcluster
 ```
 
-### Nodes
+---
+
+## Cluster Nodes
 
 ```yaml
 etcd_nodes:
@@ -292,7 +475,7 @@ etcd_nodes:
 
 # Build Process
 
-## Start VMs
+## Start Virtual Machines
 
 ```bash
 vagrant up
@@ -320,11 +503,11 @@ Expected:
 pong
 ```
 
-from all hosts.
+from all cluster nodes.
 
 ---
 
-## Deploy Cluster
+## Deploy the Cluster
 
 ```bash
 ansible-playbook cluster.yml
@@ -334,7 +517,7 @@ ansible-playbook cluster.yml
 
 # Validation
 
-## Patroni Cluster Status
+## Check Patroni Cluster
 
 ```bash
 sudo patronictl -c /etc/patroni/config.yml list
@@ -352,7 +535,7 @@ pg03  Replica  streaming
 
 ---
 
-## Check PostgreSQL
+## Verify PostgreSQL
 
 ```bash
 sudo -u postgres psql
@@ -364,18 +547,76 @@ select version();
 
 ---
 
-## Check etcd
+## Verify Replication
 
-```bash
-etcdctl endpoint health
+```sql
+select * from pg_stat_replication;
 ```
 
 ---
 
-## Check Patroni
+## Verify etcd
+
+```bash
+curl http://127.0.0.1:2379/health
+```
+
+---
+
+## Verify Patroni
 
 ```bash
 systemctl status patroni
+```
+
+---
+
+# Useful Operational Commands
+
+## Show Cluster Status
+
+```bash
+patronictl -c /etc/patroni/config.yml list
+```
+
+---
+
+## View Patroni Logs
+
+```bash
+journalctl -u patroni -f
+```
+
+---
+
+## View etcd Logs
+
+```bash
+journalctl -u etcd -f
+```
+
+---
+
+## Check PostgreSQL Processes
+
+```bash
+ps -ef | grep postgres
+```
+
+---
+
+## Check Replication Status
+
+```sql
+select * from pg_stat_replication;
+```
+
+---
+
+## Check etcd Health
+
+```bash
+curl http://127.0.0.1:2379/health
 ```
 
 ---
@@ -384,7 +625,7 @@ systemctl status patroni
 
 ## Stop Current Leader
 
-Example:
+For example:
 
 ```bash
 sudo systemctl stop patroni
@@ -394,9 +635,7 @@ on pg01.
 
 ---
 
-## Verify New Leader
-
-Run on another node:
+## Verify New Leader Election
 
 ```bash
 sudo patronictl -c /etc/patroni/config.yml list
@@ -428,15 +667,28 @@ Expected:
 Replica
 ```
 
-role after rejoining.
+after rejoining.
 
 ---
 
 # Important Implementation Notes
 
+## Patroni Owns PostgreSQL
+
+When Patroni is deployed:
+
+```bash
+systemctl stop postgresql
+systemctl disable postgresql
+```
+
+Patroni becomes the PostgreSQL process manager.
+
+---
+
 ## PostgreSQL Data Directory Permissions
 
-Must be:
+PostgreSQL data directories must be:
 
 ```text
 0700
@@ -448,30 +700,13 @@ or
 0750
 ```
 
-Incorrect permissions cause:
-
-```text
-FATAL: data directory has invalid permissions
-```
+Invalid permissions will prevent PostgreSQL from starting.
 
 ---
 
-## Patroni Owns PostgreSQL
+## Required Logging Directories
 
-When using Patroni:
-
-```bash
-systemctl stop postgresql
-systemctl disable postgresql
-```
-
-Patroni becomes the PostgreSQL process manager.
-
----
-
-## Required Log Directories
-
-Must exist before bootstrap:
+The following directories must exist prior to bootstrap:
 
 ```text
 /loftware/logs/postgres_log
@@ -479,29 +714,45 @@ Must exist before bootstrap:
 /loftware/logs/wal_archive
 ```
 
-Missing directories cause bootstrap failures.
+Missing directories can prevent PostgreSQL startup.
 
 ---
 
-## etcd v2 API
+## etcd Configuration Source
 
-Required for current Patroni configuration.
-
-etcd configuration contains:
+The Ubuntu 24.04 etcd package reads:
 
 ```text
-ETCD_ENABLE_V2="true"
+/etc/etcd/etcd.conf.yaml
 ```
 
-Without this setting Patroni cannot communicate with etcd.
+The automation templates and manages this file directly.
 
 ---
 
-## pg_hba Configuration
+## etcd v2 Compatibility
 
-Patroni bootstrap requires host-based authentication rules.
+Current Patroni implementation requires:
 
-Missing pg_hba entries can prevent bootstrap completion.
+```yaml
+enable-v2: true
+```
+
+Without v2 support Patroni cannot communicate with etcd.
+
+---
+
+## pg_hba Rules
+
+Patroni bootstrap requires valid host-based authentication rules.
+
+Missing pg_hba entries may cause:
+
+```text
+Failed to bootstrap cluster
+```
+
+errors.
 
 ---
 
@@ -512,6 +763,8 @@ Validated against:
 ```text
 Ubuntu 24.04
 PostgreSQL 17
+PGDG Repository
+Percona Repository
 Patroni 4.x
 etcd 3.4.x
 Vagrant
@@ -522,9 +775,10 @@ Not yet validated against:
 
 ```text
 PostgreSQL 18
+Cloud platforms
 Physical servers
-Cloud deployments
-Multiple datacenters
+Multi-datacenter deployments
+Kubernetes
 ```
 
 ---
@@ -534,54 +788,89 @@ Multiple datacenters
 ## Security
 
 - Ansible Vault
-- TLS between Patroni nodes
 - TLS for PostgreSQL
+- TLS for Patroni
 - TLS for etcd
+
+---
 
 ## Operations
 
-- Automated health checks
-- Automated failover validation
+- Automatic health checks
+- Automated failover testing
 - Rolling restarts
-- Rolling upgrades
+- Rolling cluster upgrades
+
+---
 
 ## Backup
 
-- pgBackRest
-- WAL archiving validation
-- PITR testing
+- pgBackRest integration
+- WAL validation
+- Point-in-time recovery testing
+
+---
 
 ## Monitoring
 
-- PostgreSQL exporter
-- Patroni exporter
 - Prometheus
 - Grafana
+- PostgreSQL Exporter
+- Patroni Exporter
+
+---
+
+## Storage
+
+- Tablespace automation
+- Backup filesystem configuration
+- Archive filesystem validation
 
 ---
 
 # Lessons Learned
 
-Key implementation discoveries:
+Key findings during implementation:
 
-- PostgreSQL data directory must use secure permissions.
-- Patroni requires ownership of PostgreSQL processes.
-- Patroni needs valid pg_hba entries during bootstrap.
-- etcd must expose the API expected by Patroni.
-- Log and archive directories must exist before cluster initialization.
-- Separating configuration from playbook logic makes the deployment reusable and version-independent.
+- PostgreSQL data directories require strict permissions.
+- Patroni must manage PostgreSQL services.
+- Valid pg_hba rules are required during bootstrap.
+- etcd v2 compatibility is required for Patroni.
+- PostgreSQL logging directories must exist before startup.
+- Ubuntu's etcd implementation consumes `/etc/etcd/etcd.conf.yaml`.
+- Variable-driven configuration greatly improves reusability.
+- Separating configuration from playbook logic simplifies maintenance.
 
 ---
 
-# Version
+# Project Status
 
-Current status:
+Current maturity:
 
 ```text
 v1.0 Lab / Proof of Concept
 ```
 
-Validated functionality:
+Successfully validated:
 
 - PostgreSQL Deployment
+- PostgreSQL Repository Abstraction (PGDG / Percona)
 - etcd Cluster Formation
+- Patroni Cluster Formation
+- Streaming Replication
+- Automatic Leader Election
+- Automated Failover
+- Cluster Rebuilds Through Ansible
+- Dynamic Configuration Through Variables
+- Template-Based Configuration Management
+
+Validated topology:
+
+```text
+3 Node PostgreSQL Cluster
+
+1 Leader
+2 Streaming Replicas
+
+3 etcd Members
+3 Patroni Members

@@ -311,7 +311,7 @@ vagrant ssh-config > ssh_config
 ## Verify Connectivity
 
 ```bash
-ansible loftware_prod -m ping -u vagrant
+ansible postgres_cluster -m ping -u vagrant
 ```
 
 Expected:

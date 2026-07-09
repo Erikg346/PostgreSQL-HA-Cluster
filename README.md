@@ -264,7 +264,7 @@ ansible-playbook cluster.yml
 ├── ssh_config
 │
 ├── group_vars
-│   └── postgres_cluster.yml
+│   └── postgresql_cluster.yml
 │
 ├── playbooks
 │   ├── postgresql.yml
@@ -372,25 +372,49 @@ Example:
 
 ---
 
-# Configuration
+# PostgreSQL Repository Support
 
-## Inventory
-
-```ini
-[loftware_prod]
-pg01
-pg02
-pg03
-```
+The framework supports multiple PostgreSQL repository providers.
 
 ---
 
-## Variables
+## PGDG (Default)
+
+```yaml
+postgres_repo: pgdg
+```
+
+Advantages:
+
+- Official PostgreSQL packages
+- Closely aligned with PostgreSQL documentation
+- Community-supported
+- Simplified package management
+
+---
+
+## Percona
+
+```yaml
+postgres_repo: percona
+```
+
+Advantages:
+
+- Enterprise-oriented distribution
+- Percona-supported packages
+- Commonly used in enterprise environments
+
+The repository source can be changed through variables without modifying playbook logic.
+
+---
+
+# Configuration
 
 File:
 
 ```text
-group_vars/postgres_cluster.yml
+group_vars/postgresql_cluster.yml
 ```
 
 ---
@@ -470,7 +494,7 @@ vagrant ssh-config > ssh_config
 ## Verify Connectivity
 
 ```bash
-ansible postgres_cluster -m ping -u vagrant
+ansible postgresql_cluster -m ping -u vagrant
 ```
 
 Expected:
@@ -850,3 +874,4 @@ Validated topology:
 
 3 etcd Members
 3 Patroni Members
+```

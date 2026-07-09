@@ -172,7 +172,7 @@ Where should this be deployed?
 Example:
 
 ```ini
-[loftware_prod]
+[postgres_cluster]
 pg01
 pg02
 pg03
@@ -264,7 +264,7 @@ ansible-playbook cluster.yml
 ├── ssh_config
 │
 ├── group_vars
-│   └── loftware_prod.yml
+│   └── postgres_cluster.yml
 │
 ├── playbooks
 │   ├── postgresql.yml
@@ -372,49 +372,25 @@ Example:
 
 ---
 
-# PostgreSQL Repository Support
-
-The framework supports multiple PostgreSQL repository providers.
-
----
-
-## PGDG (Default)
-
-```yaml
-postgres_repo: pgdg
-```
-
-Advantages:
-
-- Official PostgreSQL packages
-- Closely aligned with PostgreSQL documentation
-- Community-supported
-- Simplified package management
-
----
-
-## Percona
-
-```yaml
-postgres_repo: percona
-```
-
-Advantages:
-
-- Enterprise-oriented distribution
-- Percona-supported packages
-- Commonly used in enterprise environments
-
-The repository source can be changed through variables without modifying playbook logic.
-
----
-
 # Configuration
+
+## Inventory
+
+```ini
+[loftware_prod]
+pg01
+pg02
+pg03
+```
+
+---
+
+## Variables
 
 File:
 
 ```text
-group_vars/loftware_prod.yml
+group_vars/postgres_cluster.yml
 ```
 
 ---
@@ -494,7 +470,7 @@ vagrant ssh-config > ssh_config
 ## Verify Connectivity
 
 ```bash
-ansible loftware_prod -m ping -u vagrant
+ansible postgres_cluster -m ping -u vagrant
 ```
 
 Expected:

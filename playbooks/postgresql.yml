@@ -39,6 +39,24 @@
         signed_by: https://www.postgresql.org/media/keys/ACCC4CF8.asc
         state: present
       notify: Update apt cache
+      when: postgres_repo == "pgdg"
+
+    - name: Download Percona repository package
+      ansible.builtin.get_url:
+        url: https://repo.percona.com/apt/percona-release_latest.generic_all.deb
+        dest: /tmp/percona-release.deb
+      when: postgres_repo == "percona"
+    
+    - name: Install Percona repository
+      ansible.builtin.apt:
+        deb: /tmp/percona-release.deb
+      when: postgres_repo == "percona"
+    
+    - name: Enable Percona PostgreSQL repository
+      ansible.builtin.command:
+        cmd: "percona-release setup ppg{{ postgres_version }}"
+      when: postgres_repo == "percona"
+
 
     - name: Flush handlers
       ansible.builtin.meta: flush_handlers

@@ -3,6 +3,8 @@
 #################################################################
 postgres_version: 17
 
+postgres_repo: percona
+
 data_root: /loftware/data
 
 log_root: /loftware/logs
@@ -13,10 +15,20 @@ postgres_data_dir: "{{ data_root }}/postgresql/{{ postgres_version }}/main"
 
 postgres_bin_dir: "/usr/lib/postgresql/{{ postgres_version }}/bin"
 
-postgres_packages:
-  - "postgresql-{{ postgres_version }}"
-  - "postgresql-client-{{ postgres_version }}"
-  - "postgresql-contrib-{{ postgres_version }}"
+postgres_repositories:
+
+  pgdg:
+    packages:
+      - "postgresql-{{ postgres_version }}"
+      - "postgresql-client-{{ postgres_version }}"
+      - "postgresql-contrib-{{ postgres_version }}"
+
+  percona:
+    packages:
+      - "percona-postgresql-{{ postgres_version }}"
+
+
+postgres_packages: "{{ postgres_repositories[postgres_repo].packages }}"
 
 postgres_parameters:
   max_connections: 200
@@ -61,7 +73,7 @@ postgres_superuser:
 
 postgres_replication:
   username: replicator
-  password: chnageme
+  password: changeme
 
 patroni_admin:
   username: admin

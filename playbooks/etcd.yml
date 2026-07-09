@@ -1,0 +1,120 @@
+---
+- name: Build etcd Cluster
+  hosts: postgres_cluster
+  become: true
+
+  tasks:
+
+    #################################################################
+    # Install etcd
+    #################################################################
+
+    - name: Install etcd packages
+      ansible.builtin.apt:
+        name:
+          - etcd-server
+          - etcd-client
+        state: present
+        update_cache: true
+
+    #################################################################
+    # Determine Current Node
+    #################################################################
+
+    - name: Determine this node's configuration
+      ansible.builtin.set_fact:
+        current_node: >-
+          {{
+            etcd_nodes
+            | selectattr('name', 'equalto', inventory_hostname)
+            | first
+          }}
+
+    #################################################################
+    # Build etcd Cluster String
+    #################################################################
+
+    - name: Build initial cluster string
+      ansible.builtin.set_fact:
+        etcd_initial_cluster: >-
+          {%- for node in etcd_nodes -%}
+          {{ node.name }}=http://{{ node.ip }}:{{ etcd_peer_port }}
+          {%- if not loop.last -%},{%- endif -%}
+          {%- endfor -%}
+
+    #################################################################
+    # Display Configuration
+    #################################################################
+
+    - name: Display current node
+      ansible.builtin.debug:
+        var: current_node
+
+    - name: Display initial cluster
+      ansible.builtin.debug:
+        var: etcd_initial_cluster
+
+    #################################################################
+    # Configure etcd
+    #################################################################
+
+    - name: Configure etcd
+      ansible.builtin.blockinfile:
+        path: /etc/default/etcd
+        create: true
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        block: |
+
+          ETCD_NAME="{{ current_node.name }}"
+
+          ETCD_DATA_DIR="/var/lib/etcd"
+
+          ETCD_LISTEN_PEER_URLS="http://{{ current_node.ip }}:{{ etcd_peer_port }}"
+
+          ETCD_LISTEN_CLIENT_URLS="http://{{ current_node.ip }}:{{ etcd_client_port }},http://127.0.0.1:{{ etcd_client_port }}"
+
+          ETCD_INITIAL_ADVERTISE_PEER_URLS="http://{{ current_node.ip }}:{{ etcd_peer_port }}"
+
+          ETCD_ADVERTISE_CLIENT_URLS="http://{{ current_node.ip }}:{{ etcd_client_port }}"
+
+          ETCD_INITIAL_CLUSTER="{{ etcd_initial_cluster }}"
+
+          ETCD_INITIAL_CLUSTER_STATE="new"
+
+          ETCD_INITIAL_CLUSTER_TOKEN="{{ etcd_cluster_token }}"
+
+          ETCD_ENABLE_V2="true"
+
+    #################################################################
+    # Restart Service
+    #################################################################
+
+    - name: Restart etcd
+      ansible.builtin.service:
+        name: etcd
+        state: restarted
+        enabled: true
+
+    #################################################################
+    # Validation
+    #################################################################
+
+    - name: Check etcd status
+      ansible.builtin.command:
+        cmd: systemctl is-active etcd
+      register: etcd_status
+      changed_when: false
+
+    - name: Display etcd status
+      ansible.builtin.debug:
+        msg: "etcd service state: {{ etcd_status.stdout }}"
+
+    - name: Verify port 2379
+      ansible.builtin.command:
+        cmd: ss -ltn
+      register: etcd_ports
+      changed_when: false
+
+    - name: Display listening ports
+      ansible.builtin.debug:
+        var: etcd_ports.stdout_lines

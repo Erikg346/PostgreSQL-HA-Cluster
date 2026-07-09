@@ -1,0 +1,68 @@
+#################################################################
+# PostgreSQL Configuration
+#################################################################
+postgres_version: 17
+
+data_root: /loftware/data
+
+log_root: /loftware/logs
+
+postgres_port: 5432
+
+postgres_data_dir: "{{ data_root }}/postgresql/{{ postgres_version }}/main"
+
+postgres_bin_dir: "/usr/lib/postgresql/{{ postgres_version }}/bin"
+
+postgres_packages:
+  - "postgresql-{{ postgres_version }}"
+  - "postgresql-client-{{ postgres_version }}"
+  - "postgresql-contrib-{{ postgres_version }}"
+
+postgres_parameters:
+  max_connections: 200
+  shared_buffers: 512MB
+  logging_collector: "on"
+
+
+
+#################################################################
+# etcd Configuration
+#################################################################
+
+etcd_cluster_token: pgcluster
+
+etcd_client_port: 2379
+
+etcd_peer_port: 2380
+
+etcd_nodes:
+  - name: pg01
+    ip: 192.168.56.11
+
+  - name: pg02
+    ip: 192.168.56.12
+
+  - name: pg03
+    ip: 192.168.56.13
+
+
+
+#################################################################
+# Patroni Configuration
+#################################################################
+
+cluster_name: postgres-cluster
+
+patroni_rest_port: 8008
+
+postgres_superuser:
+  username: postgres
+  password: changeme
+
+postgres_replication:
+  username: replicator
+  password: chnageme
+
+patroni_admin:
+  username: admin
+  password: changeme

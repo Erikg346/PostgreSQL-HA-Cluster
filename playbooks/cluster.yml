@@ -1,0 +1,6 @@
+---
+- import_playbook: postgresql.yml
+
+- import_playbook: etcd.yml
+
+- import_playbook: patroni.yml

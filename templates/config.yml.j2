@@ -1,0 +1,120 @@
+scope: {{ cluster_name }}
+
+namespace: {{ patroni_namespace | default('/service/') }}
+
+name: {{ current_node.name }}
+
+restapi:
+  listen: {{ current_node.ip }}:{{ patroni_rest_port }}
+  connect_address: {{ current_node.ip }}:{{ patroni_rest_port }}
+
+etcd:
+  hosts:
+{% for node in etcd_nodes %}
+    - {{ node.ip }}:{{ etcd_client_port }}
+{% endfor %}
+
+bootstrap:
+
+  dcs:
+
+    ttl: 30
+
+    loop_wait: 10
+
+    retry_timeout: 10
+
+    maximum_lag_on_failover: 1048576
+
+    postgresql:
+
+      use_pg_rewind: true
+
+      use_slots: true
+
+      pg_hba:
+
+        - local all all trust
+
+        - host all all 127.0.0.1/32 trust
+
+        - host all all 0.0.0.0/0 md5
+
+        - host replication {{ postgres_replication.username }} 0.0.0.0/0 md5
+
+      parameters:
+
+        wal_level: replica
+
+        hot_standby: "on"
+
+        wal_keep_size: 512MB
+
+        max_wal_senders: 10
+
+        max_replication_slots: 10
+
+        archive_mode: "on"
+
+        archive_timeout: 1800s
+
+        archive_command: 'cp %p {{ log_root }}/wal_archive/%f'
+
+        logging_collector: "on"
+
+        log_directory: '{{ log_root }}/postgres_log'
+
+        log_filename: 'postgresql-%Y-%m-%d.log'
+
+        dynamic_shared_memory_type: mmap
+
+{% for parameter, value in postgres_parameters.items() %}
+        {{ parameter }}: {{ value }}
+{% endfor %}
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+  users:
+
+    {{ patroni_admin.username }}:
+      password: {{ patroni_admin.password }}
+
+      options:
+        - createrole
+        - createdb
+
+postgresql:
+
+  listen: {{ current_node.ip }}:{{ postgres_port }}
+
+  connect_address: {{ current_node.ip }}:{{ postgres_port }}
+
+  data_dir: {{ postgres_data_dir }}
+
+  bin_dir: {{ postgres_bin_dir }}
+
+  authentication:
+
+    replication:
+      username: {{ postgres_replication.username }}
+      password: {{ postgres_replication.password }}
+
+    superuser:
+      username: {{ postgres_superuser.username }}
+      password: {{ postgres_superuser.password }}
+
+  parameters:
+
+    unix_socket_directories: '/var/run/postgresql'
+
+tags:
+
+  nofailover: false
+
+  noloadbalance: false
+
+  clonefrom: false
+
+  nosync: false

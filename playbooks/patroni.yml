@@ -1,0 +1,67 @@
+---
+- name: Build Patroni Layer
+  hosts: postgres_cluster
+  become: true
+
+  tasks:
+
+    - name: Stop PostgreSQL service
+      ansible.builtin.service:
+        name: postgresql
+        state: stopped
+        enabled: false
+
+    - name: Install Patroni
+      ansible.builtin.apt:
+        name:
+          - patroni
+          - python3-psycopg2
+        state: present
+
+    - name: Determine current node
+      ansible.builtin.set_fact:
+        current_node: >-
+          {{
+            etcd_nodes
+            | selectattr('name', 'equalto', inventory_hostname)
+            | first
+          }}
+
+    - name: Create Patroni configuration directory
+      ansible.builtin.file:
+        path: /etc/patroni
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0755"
+
+    - name: Deploy Patroni configuration
+      ansible.builtin.template:
+        src: ../templates/config.yml.j2
+        dest: /etc/patroni/config.yml
+        owner: postgres
+        group: postgres
+        mode: "0644"
+
+    - name: Restart Patroni
+      ansible.builtin.service:
+        name: patroni
+        enabled: true
+        state: restarted
+
+    - name: Wait for Patroni to stabilize
+      ansible.builtin.pause:
+        seconds: 15
+      run_once: true
+    
+    - name: Display Patroni cluster status
+      ansible.builtin.command:
+        cmd: patronictl -c /etc/patroni/config.yml list
+      register: patroni_cluster
+      changed_when: false
+      run_once: true
+    
+    - name: Show Patroni cluster
+      ansible.builtin.debug:
+        msg: "{{ patroni_cluster.stdout_lines }}"
+      run_once: true

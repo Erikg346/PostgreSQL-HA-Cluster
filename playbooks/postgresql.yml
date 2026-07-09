@@ -1,0 +1,116 @@
+---
+- name: Build PostgreSQL Server
+  hosts: postgres_cluster
+  become: true
+
+  handlers:
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+  tasks:
+
+    #################################################################
+    # Repository Setup
+    #################################################################
+
+    - name: Install repository prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - python3-debian
+        state: present
+        update_cache: true
+
+    - name: Configure PGDG repository
+      ansible.builtin.deb822_repository:
+        name: postgresql
+        types:
+          - deb
+        uris:
+          - http://apt.postgresql.org/pub/repos/apt
+        suites:
+          - "{{ ansible_facts['distribution_release'] }}-pgdg"
+        components:
+          - main
+        signed_by: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+      notify: Update apt cache
+
+    - name: Flush handlers
+      ansible.builtin.meta: flush_handlers
+
+    #################################################################
+    # PostgreSQL Installation
+    #################################################################
+
+    - name: Install PostgreSQL packages
+      ansible.builtin.apt:
+        name: "{{ postgres_packages }}"
+        state: present
+
+    #################################################################
+    # Directory Structure
+    #################################################################
+    - name: Create PostgreSQL directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0755"
+      loop:
+        - "{{ data_root }}"
+        - "{{ data_root }}/postgresql"
+        - "{{ data_root }}/postgresql/{{ postgres_version }}"
+        - "{{ log_root }}"
+        - "{{ log_root }}/postgres_log"
+        - "{{ log_root }}/wal_archive"
+
+
+    - name: Create PostgreSQL data directory
+      ansible.builtin.file:
+        path: "{{ postgres_data_dir }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: "0700"
+
+    #################################################################
+    # Service Configuration
+    #################################################################
+
+    - name: Ensure PostgreSQL service is enabled and running
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+        enabled: true
+
+    #################################################################
+    # Validation
+    #################################################################
+
+    - name: Verify PostgreSQL version
+      ansible.builtin.command:
+        cmd: psql --version
+      register: postgres_version_result
+      changed_when: false
+
+    - name: Display PostgreSQL version
+      ansible.builtin.debug:
+        msg: "{{ postgres_version_result.stdout }}"
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    - name: Display PostgreSQL service state
+      ansible.builtin.debug:
+        msg: >
+          PostgreSQL service state:
+          {{
+            ansible_facts.services['postgresql.service'].state
+            | default('unknown')
+          }}

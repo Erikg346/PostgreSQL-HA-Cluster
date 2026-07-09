@@ -1,0 +1,28 @@
+# Ansible
+*.retry
+
+# Vagrant
+.vagrant/
+
+# VMware
+*.log
+*.lck
+*.vmx~
+*.vmdk
+
+# MacOS
+.DS_Store
+
+# SSH
+ssh_config
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets
+vault.yml
+*.vault
+
+# Local inventory overrides
+inventory.local.ini

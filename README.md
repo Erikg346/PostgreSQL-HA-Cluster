@@ -73,7 +73,7 @@ Where should this be deployed?
 Example:
 
 ```ini
-[loftware_prod]
+[postgres_cluster]
 pg01
 pg02
 pg03
@@ -126,7 +126,7 @@ cluster.yml
 ├── cluster.yml
 │
 ├── group_vars
-│   └── loftware_prod.yml
+│   └── postgres_cluster.yml
 │
 ├── playbooks
 │   ├── postgresql.yml
@@ -228,7 +228,7 @@ Example:
 ## Inventory
 
 ```ini
-[loftware_prod]
+[postgres_cluster]
 pg01
 pg02
 pg03
@@ -241,7 +241,7 @@ pg03
 File:
 
 ```text
-group_vars/loftware_prod.yml
+group_vars/postgres_cluster.yml
 ```
 
 ### PostgreSQL

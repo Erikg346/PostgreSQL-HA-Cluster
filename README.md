@@ -494,7 +494,7 @@ vagrant ssh-config > ssh_config
 ## Verify Connectivity
 
 ```bash
-ansible postgresql_cluster -m ping -u vagrant
+ansible postgres_cluster -m ping -u vagrant
 ```
 
 Expected:
@@ -510,7 +510,7 @@ from all cluster nodes.
 ## Deploy the Cluster
 
 ```bash
-ansible-playbook cluster.yml
+ansible-playbook ./playbooks/cluster.yml
 ```
 
 ---
